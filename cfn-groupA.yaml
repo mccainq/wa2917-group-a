@@ -1,0 +1,223 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Metadata:
+    Generator: "former2"
+Description: "Tech Excellence Group A Project - Tweet Sentiment Analysis"
+Parameters:
+    twitterbearer:
+        Type: "String"
+        Description: "Twitter Bearer Token"
+        AllowedPattern: ".+"
+
+Resources:
+    LambdaFunction:
+        Type: "AWS::Lambda::Function"
+        Properties:
+            Description: "An Amazon S3 trigger that retrieves metadata for the object that has been updated."
+            FunctionName: !Sub "getTweetFromS3ProcessLoad${AthenaDataCatalog}"
+            Handler: "lambda_function.lambda_handler"
+            Code: 
+                S3Bucket: !Sub "awslambda-${AWS::Region}-tasks"
+                S3Key: !Sub "/snapshots/${AWS::AccountId}/getTweetFromS3ProcessLoad${AthenaDataCatalog}-f6c2d14d-d091-4435-a425-6f71f7d0de22"
+                S3ObjectVersion: "diSXS9eeCOIOzJIXY8NwozGPiUmDQbOT"
+            MemorySize: 128
+            Role: !Sub "arn:aws:iam::${AWS::AccountId}:role/service-role/s3-${LambdaFunction4}DB-lambda-role"
+            Runtime: "python3.7"
+            Timeout: 3
+            TracingConfig: 
+                Mode: "PassThrough"
+
+    LambdaFunction2:
+        Type: "AWS::Lambda::Function"
+        Properties:
+            Description: ""
+            FunctionName: "getTweets"
+            Handler: "lambda_function.lambda_handler"
+            Code: 
+                S3Bucket: !Sub "awslambda-${AWS::Region}-tasks"
+                S3Key: !Sub "/snapshots/${AWS::AccountId}/getTweets-97286d28-b6a3-46af-8d9a-7dbe73d7a7ad"
+                S3ObjectVersion: "UBZuxRIKYtv_UMBeZwvJFR4bgwbVHk.C"
+            MemorySize: 128
+            Role: !GetAtt IAMRole6.Arn
+            Runtime: "python3.8"
+            Timeout: 66
+            TracingConfig: 
+                Mode: "PassThrough"
+
+    LambdaFunction3:
+        Type: "AWS::Lambda::Function"
+        Properties:
+            Description: ""
+            FunctionName: "getTweetSentimentScore"
+            Handler: "handler.lambda_handler"
+            Code: 
+                S3Bucket: !Sub "awslambda-${AWS::Region}-tasks"
+                S3Key: !Sub "/snapshots/${AWS::AccountId}/getTweetSentimentScore-159d7f06-d4e9-4c42-ba08-d26e6444b3cc"
+                S3ObjectVersion: "pXh00AbVlKQOSG4B4ZUSJglH2vva4bwW"
+            MemorySize: 128
+            Role: !GetAtt IAMRole4.Arn
+            Runtime: "python3.7"
+            Timeout: 5
+            TracingConfig: 
+                Mode: "PassThrough"
+
+    LambdaFunction4:
+        Type: "AWS::Lambda::Function"
+        Properties:
+            Description: !Sub "Enables Amazon Athena to communicate with ${AthenaDataCatalog}, making your tables accessible via SQL"
+            Environment: 
+                Variables: 
+                    spill_prefix: "athena-spill"
+                    disable_spill_encryption: "false"
+                    spill_bucket: "athena-dynam-spill-bkt"
+            FunctionName: "dynamo"
+            Handler: !Sub "com.amazonaws.athena.connectors.dynamodb.${AthenaDataCatalog}CompositeHandler"
+            Code: 
+                S3Bucket: !Sub "awslambda-${AWS::Region}-tasks"
+                S3Key: !Sub "/snapshots/${AWS::AccountId}/dynamo-8bb58e01-3057-46ed-91b1-50862ae96e9f"
+                S3ObjectVersion: "Dmp2_TsWx0_ymsD_jJSKQs_Ab7Xg2gB9"
+            MemorySize: 3008
+            Role: !Sub "arn:aws:iam::${AWS::AccountId}:role/serverlessrepo-Athena${AthenaDataCatalog}C-ConnectorConfigRole-C5AKZTCWAUBB"
+            Runtime: "java8"
+            Timeout: 900
+            TracingConfig: 
+                Mode: "PassThrough"
+
+    DynamoDBTable:
+        Type: "AWS::DynamoDB::Table"
+        Properties:
+            AttributeDefinitions: 
+              - 
+                AttributeName: "tweetID"
+                AttributeType: "S"
+            TableName: "TweetStreamTable"
+            KeySchema: 
+              - 
+                AttributeName: "tweetID"
+                KeyType: "HASH"
+            ProvisionedThroughput: 
+                ReadCapacityUnits: 5
+                WriteCapacityUnits: 5
+            StreamSpecification: 
+                StreamViewType: "NEW_IMAGE"
+
+    S3Bucket:
+        Type: "AWS::S3::Bucket"
+        Properties:
+            BucketName: "sentiment-analysis-g1"
+            Tags: 
+              - 
+                Key: "name"
+                Value: "s3-bucket"
+            NotificationConfiguration: 
+                LambdaConfigurations: 
+                  - 
+                    Event: "s3:ObjectCreated:Put"
+                    Filter: 
+                        S3Key: 
+                            Rules: 
+                              - 
+                                Name: "Suffix"
+                                Value: ".json"
+                    Function: !GetAtt LambdaFunction.Arn
+
+    QuickSightAnalysis:
+        Type: "AWS::QuickSight::Analysis"
+        Properties:
+            AnalysisId: "45067853-3b46-48b7-b164-32cc07b6f8b1"
+            Name: "tweetstreamtable analysis"
+            AwsAccountId: !Ref AWS::AccountId
+
+    AthenaDataCatalog:
+        Type: "AWS::Athena::DataCatalog"
+        Properties:
+            Name: "DynamoDB"
+            Type: "LAMBDA"
+            Parameters: 
+                catalog: "DynamoDB"
+                metadata-function: !Sub "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:dynamo"
+                record-function: !Sub "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:dynamo"
+
+    IAMRole:
+        Type: "AWS::IAM::Role"
+        Properties:
+            Path: "/service-role/"
+            RoleName: !Sub "Athena${AthenaDataCatalog}Connector-role-08ylasjk"
+            AssumeRolePolicyDocument: "{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Principal\":{\"Service\":\"lambda.amazonaws.com\"},\"Action\":\"sts:AssumeRole\"}]}"
+            MaxSessionDuration: 3600
+            ManagedPolicyArns: 
+              - !Sub "arn:aws:iam::${AWS::AccountId}:policy/service-role/AWSLambdaBasicExecutionRole-e5be6299-70c4-440d-b06b-5746d31f148a"
+
+    IAMRole2:
+        Type: "AWS::IAM::Role"
+        Properties:
+            Path: "/service-role/"
+            RoleName: "aws-quicksight-service-role-v0"
+            AssumeRolePolicyDocument: "{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Principal\":{\"Service\":\"quicksight.amazonaws.com\"},\"Action\":\"sts:AssumeRole\"}]}"
+            MaxSessionDuration: 3600
+            ManagedPolicyArns: 
+              - !Sub "arn:aws:iam::${AWS::AccountId}:policy/service-role/AWSQuickSightIAMPolicy"
+
+    IAMRole3:
+        Type: "AWS::IAM::Role"
+        Properties:
+            Path: "/service-role/"
+            RoleName: "aws-quicksight-s3-consumers-role-v0"
+            AssumeRolePolicyDocument: "{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Principal\":{\"Service\":\"quicksight.amazonaws.com\"},\"Action\":\"sts:AssumeRole\"}]}"
+            MaxSessionDuration: 3600
+            ManagedPolicyArns: 
+              - !Sub "arn:aws:iam::${AWS::AccountId}:policy/service-role/AWSQuickSightLambdaPolicy"
+              - !Sub "arn:aws:iam::${AWS::AccountId}:policy/service-role/AWSQuickSightS3ConsumersPolicy"
+              - "arn:aws:iam::aws:policy/service-role/AWSQuicksightAthenaAccess"
+
+    IAMRole4:
+        Type: "AWS::IAM::Role"
+        Properties:
+            Path: "/service-role/"
+            RoleName: "DynamoDbStreamLambdaRole"
+            AssumeRolePolicyDocument: "{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Principal\":{\"Service\":\"lambda.amazonaws.com\"},\"Action\":\"sts:AssumeRole\"}]}"
+            MaxSessionDuration: 3600
+
+    IAMRole5:
+        Type: "AWS::IAM::Role"
+        Properties:
+            Path: "/service-role/"
+            RoleName: "getUserQueryResults-role-y66ycx28"
+            AssumeRolePolicyDocument: "{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Principal\":{\"Service\":[\"ssm.amazonaws.com\",\"lambda.amazonaws.com\"]},\"Action\":\"sts:AssumeRole\"}]}"
+            MaxSessionDuration: 3600
+            ManagedPolicyArns: 
+              - !Sub "arn:aws:iam::${AWS::AccountId}:policy/service-role/AWSLambdaBasicExecutionRole-7bd3c382-0f3b-4e21-afec-aeb63e5a7db9"
+              - "arn:aws:iam::aws:policy/AdministratorAccess"
+
+    IAMRole6:
+        Type: "AWS::IAM::Role"
+        Properties:
+            Path: "/service-role/"
+            RoleName: "getTweets-role-2r3g47l2"
+            AssumeRolePolicyDocument: "{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Principal\":{\"Service\":\"lambda.amazonaws.com\"},\"Action\":\"sts:AssumeRole\"}]}"
+            MaxSessionDuration: 3600
+            ManagedPolicyArns: 
+              - !Sub "arn:aws:iam::${AWS::AccountId}:policy/service-role/AWSLambdaBasicExecutionRole-18259d0a-e3d5-4d38-a070-e556193785ca"
+              - "arn:aws:iam::aws:policy/AmazonS3FullAccess"
+              - "arn:aws:iam::aws:policy/AmazonSSMFullAccess"
+              - "arn:aws:iam::aws:policy/AmazonSSMReadOnlyAccess"
+
+    IAMRole7:
+        Type: "AWS::IAM::Role"
+        Properties:
+            Path: "/service-role/"
+            RoleName: !Sub "s3-${LambdaFunction4}DB-lambda-role"
+            AssumeRolePolicyDocument: "{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Principal\":{\"Service\":\"lambda.amazonaws.com\"},\"Action\":\"sts:AssumeRole\"}]}"
+            MaxSessionDuration: 3600
+            ManagedPolicyArns: 
+              - !Sub "arn:aws:iam::${AWS::AccountId}:policy/service-role/AWSLambdaS3ExecutionRole-7b736201-eb0c-465a-b316-cd30c27836f0"
+              - !Sub "arn:aws:iam::${AWS::AccountId}:policy/service-role/AWSLambdaBasicExecutionRole-cd4ad045-e829-42ff-9662-6e9765d44a0d"
+
+    SSMParameter:
+        Type: "AWS::SSM::Parameter"
+        Properties:
+            Name: "twitter_bearer"
+            Type: "String"
+            Value: !Ref twitterbearer
+            DataType: "text"
+            Tier: "Standard"
+
